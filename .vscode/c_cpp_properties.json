@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/tomas/catkin_ws/devel_isolated/panda_gazebo_controllers/include/**",
+        "/home/tomas/catkin_ws/devel_isolated/camera_aravis/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/tomas/catkin_ws/src/dingo_kinova/gomp/include/**",
+        "/home/tomas/catkin_ws/src/grasps/include/**",
+        "/home/tomas/catkin_ws/src/Franka_MPPI/panda_gazebo_controllers/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

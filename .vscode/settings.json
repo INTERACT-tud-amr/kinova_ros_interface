@@ -1,0 +1,22 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/tomas/catkin_ws/devel_isolated/gomp/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/vppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/seq_vppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/panda_mppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/panda_gazebo_controllers/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/grasps/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/camera_aravis/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/tomas/catkin_ws/devel_isolated/gomp/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/vppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/seq_vppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/panda_mppi/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/panda_gazebo_controllers/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/grasps/lib/python3/dist-packages",
+        "/home/tomas/catkin_ws/devel_isolated/camera_aravis/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
+}

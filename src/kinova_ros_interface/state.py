@@ -13,6 +13,7 @@ class JointData:
         """Initialize vectors."""
         self.q = np.zeros(self.n)
         self.dq = np.zeros(self.n)
+        self.torque = np.zeros(self.n)
         self.fault = np.zeros(self.n)
 
 

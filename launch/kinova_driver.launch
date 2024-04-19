@@ -1,3 +1,5 @@
 <launch>
+  <rosparam command="load" file="$(find kinova_ros_interface)/config/config.yaml" />
+
   <node name="kinova_ros_interface" pkg="kinova_ros_interface" type="main.py" args="" output="screen"/>
 </launch>

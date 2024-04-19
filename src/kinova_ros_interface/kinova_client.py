@@ -21,7 +21,9 @@ class KinovaRobot():
                  router: RouterClient = None,
                  real_time_router: RouterClient = None,
                  actuator_config: ActuatorConfigClient = None,
-                 state: State = None) -> None:
+                 state: State = None,
+                 alpha_dq: float = 0.7,
+                 alpha_torque: float = 0.7) -> None:
         
         if None in [base, base_cyclic, actuator_config]:
             self.base = BaseClient(router)
@@ -41,10 +43,18 @@ class KinovaRobot():
         self._set_servoing_mode(Base_pb2.SINGLE_LEVEL_SERVOING) # A second client is attempting to control the robot while it is in single-level servoing mode
 
         # Refresh
+        self.controller_connected = False
         self.refresh_feedback()
 
         # Initialize commands
-        # self._initialize_command()
+        self._initialize_command()
+        self.joints_command = np.zeros(self.actuator_count)
+
+        # First-order filter
+        self.dq_old = np.zeros(self.actuator_count)
+        self.alpha_dq = alpha_dq
+        self.torque_old = np.zeros(self.actuator_count)
+        self.alpha_torque = alpha_torque
 
         # self.rate_counter = RateCounter(1000)
 
@@ -63,7 +73,13 @@ class KinovaRobot():
 
     def get_velocity(self, joint: int) -> float:
         velocity = getattr(self.feedback.actuators[joint], "velocity")
+        
+
         return np.deg2rad(velocity)
+
+    def get_torque(self, joint: int) -> float:
+        """Get the torque of a joint."""
+        return getattr(self.feedback.actuators[joint], "torque")
 
     def get_gripper_position(self) -> float:
         """Get the gripper position."""
@@ -72,12 +88,29 @@ class KinovaRobot():
 
     def update_state(self) -> None:
         for n in range(self.actuator_count):
+            # Read position
             self.state.kinova_feedback.q[n] = self.get_position(n)
-            self.state.kinova_feedback.dq[n] = self.get_velocity(n)
+            # Read velocity
+            dq_new = self.get_velocity(n)
+            self.state.kinova_feedback.dq[n] = self.alpha_dq*dq_new + (1- self.alpha_dq)*self.dq_old[n]
+            self.dq_old[n] = dq_new
+            # Read torque
+            torque_new = self.get_torque(n)
+            self.state.kinova_feedback.torque[n] = self.alpha_torque*torque_new + (1- self.alpha_torque)*self.torque_old[n]
+            self.torque_old[n] = torque_new
+            # Read error
             self.state.kinova_feedback.fault[n] = self.feedback.actuators[n].fault_bank_a
 
     def refresh_feedback(self) -> None:
-        self.feedback =  self.base_cyclic.RefreshFeedback()
+        """Refresh."""
+        if not self.changing_servoing_mode and self.controller_connected:
+            try:
+                self.feedback = self.base_cyclic.Refresh(self.command)
+            except Exception as e:
+                print(f"Exception: {e}")
+                self.controller_connected = False
+        else:
+            self.feedback = self.base_cyclic.RefreshFeedback()
 
     def start_feedback_in_new_thread(self) -> None:
         thread = Thread(target=self.start_feedback)
@@ -96,13 +129,17 @@ class KinovaRobot():
         while self.active:
             self.refresh_feedback()
             self.update_state()
+            if self.mode == "LLC_task":
+                if not np.any(self.state.kinova_feedback.fault):
+                    self.set_command(self.joints_command)
+                else:
+                    print("not implemented")
     
 
     def _set_servoing_mode(self, value: int) -> None:
         """Set the servoing mode of the robot."""
         self.changing_servoing_mode = True
         base_servo_mode = Base_pb2.ServoingModeInformation()
-        print("servo mode: ", base_servo_mode)
         base_servo_mode.servoing_mode = value
         self.base.SetServoingMode(base_servo_mode)
         self._update_modes()    #default is position mode
@@ -143,19 +180,11 @@ class KinovaRobot():
         finger = gripper_command.gripper.finger.add()
         finger.finger_identifier = 1
         pos = self.get_gripper_position() + pos_msg
-        print(pos)
         if pos >= 0.0 and pos <= 0.8:
             finger.value = pos
             self.base.SendGripperCommand(gripper_command)
         else:
             print("Invalid command for gripper")
-
-    # def copy_feedback_to_command(self, joint: int = None) -> None:
-    #     """Copy the feedback to the command message."""
-    #     for prop in ["position", "velocity", "current_motor"]:
-    #         for n in range(self.actuator_count) if joint is None else [joint]:
-    #             value = getattr(self.feedback.actuators[n], prop)
-    #             setattr(self.command.actuators[n], prop, value)
 
     def set_high_level_position(self, position) -> None:
         """Perform a high level move."""
@@ -171,46 +200,18 @@ class KinovaRobot():
         return self._execute_action(action)
 
     def set_high_level_velocity(self, velocity) -> None:
-        # joint_speeds = Base_pb2.JointSpeeds()
-
-
-        # for n, speed in enumerate(velocity):
-        #     joint_speed = joint_speeds.joint_speeds.add()
-        #     joint_speed.joint_identifier = n
-        #     joint_speed.value = speed
-        #     joint_speed.duration = 0
-        # self.base.SendJointSpeedsCommand(joint_speeds)
-        # # self.base.Stop()
-        print(self.base.GetServoingMode())
-        base_servo_mode = Base_pb2.ServoingModeInformation()
-        base_servo_mode.servoing_mode = Base_pb2.SINGLE_LEVEL_SERVOING
-        # self.base.SetServoingMode(base_servo_mode)
-        print(base_servo_mode)
         joint_speeds = Base_pb2.JointSpeeds()
-        SPEED = 20.0
-
-
-        print ("Sending the joint speeds for 10 seconds...")
-        for times in range(4):
-            del joint_speeds.joint_speeds[:]
-            if times % 2:
-                speeds = [-SPEED, 0.0, 0.0, SPEED, 0.0, 0.0]
-            else:
-                speeds = [SPEED, 0.0, 0.0, -SPEED, 0.0, 0.0]
-            i = 0
-            for speed in speeds:
+        speeds = list(velocity)
+        if not np.any(self.state.kinova_feedback.fault):
+            for n, speed in enumerate(speeds):
                 joint_speed = joint_speeds.joint_speeds.add()
-                joint_speed.joint_identifier = i 
+                joint_speed.joint_identifier = n
                 joint_speed.value = speed
                 joint_speed.duration = 0
-                i = i + 1
-            
+            start = time.time()
             self.base.SendJointSpeedsCommand(joint_speeds)
-            time.sleep(2.5)
-
-        print ("Stopping the robot")
-        self.base.Stop()
-
+        else:
+            pass
 
     def _execute_action(self, action: Base_pb2.Action = None) -> bool:
         event = Event()
@@ -223,10 +224,10 @@ class KinovaRobot():
         self.base.Unsubscribe(notification_handle)
 
         if finished:
-            print(f"Position {action.name} reached")
+            success = True
         else:
-            print("Timeout on action notification wait")
-        return finished
+            success = False
+        return success
 
     def _check_for_end_or_abort(self, event: Event) -> callable:
         """Return a closure checking for END or ABORT notifications."""
@@ -236,3 +237,63 @@ class KinovaRobot():
                 event.set()
 
         return check
+
+
+    def copy_feedback_to_command(self, joint: int = None) -> None:
+        """Copy the feedback to the command message."""
+        for prop in ["position", "velocity", "current_motor"]:
+            for n in range(self.actuator_count) if joint is None else [joint]:
+                value = getattr(self.feedback.actuators[n], prop)
+                setattr(self.command.actuators[n], prop, value)
+
+    def start_LLC(self) -> None:
+        """Start low_level control and set the position mode for safety"""
+        self.copy_feedback_to_command()
+        for n in range(self.actuator_count):
+            self.set_control_mode(n, "position")
+        self._set_servoing_mode(Base_pb2.LOW_LEVEL_SERVOING)
+        self.mode = "LLC"
+
+    def connect_LLC(self) -> None:
+        """Connect a controller to the LLC of the robot."""
+        # self.state.controller.start_control_loop()
+        for n in range(self.actuator_count):
+            self.copy_feedback_to_command()
+            self.base_cyclic.Refresh(self.command)
+            self.set_control_mode(n, "velocity")
+        self.controller_connected = True
+        self.mode = "LLC_task"
+
+    
+    def disconnect_LLC(self) -> None:
+        """Disconnect a controller from the LLC of the robot."""
+        self.controller_connected = False
+        for joint in range(self.actuator_count):
+            self.set_control_mode(joint, "position")
+        # self.state.controller.stop_control_loop() #TODO
+        self.mode = "LLC"
+
+
+    def stop_LLC(self) -> None:
+        """Stop low_level control."""
+        self._set_servoing_mode(Base_pb2.SINGLE_LEVEL_SERVOING)
+        self.mode = "HLC"
+        return True, "Low_level control disabled."
+
+    def set_command(self, commands: list) -> None:
+        """Set the command."""
+        for n, command in enumerate(commands):
+            self.copy_feedback_to_command(n)
+            self.command.actuators[n].velocity = command
+
+
+    def get_control_modes(self):
+        """Get the control mode of an actuator."""
+        return [
+            ActuatorConfig_pb2.ControlMode.Name(self.actuator_modes[n])
+            for n in range(self.actuator_count)
+        ]
+
+    def get_servoing_mode(self):
+        """Get the servoing mode of the robot."""
+        return Base_pb2.ServoingMode.Name(self.servoing_mode)

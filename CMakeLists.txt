@@ -16,7 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_python_setup()
 
 catkin_package(
-  INCLUDE_DIRS include
   LIBRARIES kinova_ros_interface
   CATKIN_DEPENDS 
     roscpp 
@@ -29,7 +28,6 @@ catkin_package(
 ###########
 
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
 )
 

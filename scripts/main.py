@@ -98,7 +98,7 @@ class ControlInterface():
             self.state.kinova_command.q = msg.data
             self.kinova.set_high_level_position(self.state.kinova_command.q)
         elif self.mode == "HLC_velocity":
-            self.state.kinova_command.dq = np.rad_to_deg(msg.data)
+            self.state.kinova_command.dq = np.rad2deg(msg.data)
             self.kinova.set_high_level_velocity(self.state.kinova_command.dq)
         elif self.mode == "LLC_velocity":
             self.kinova.joints_command = msg.data

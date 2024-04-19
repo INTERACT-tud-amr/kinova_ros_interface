@@ -21,6 +21,9 @@ Topics:
 3. `/kinova/gripper` - Topic for controlling relative fingers' positions
 4. `/kinova/joint_states` - Topic for subscribing the actual state of the robot in [rad, rad/s, Nm]
 
+Useful services:
+1. `rosservice call /kinova/go_zero_position` - Move an arm to zero joint position
+2. `rosservice call /kinova/go_home_position` - Move an arm to home joint position
 
 
 

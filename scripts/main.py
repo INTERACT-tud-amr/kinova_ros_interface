@@ -4,7 +4,7 @@ import rospy
 from threading import Thread
 import time
 import sys
-import yaml
+import numpy as np
 
 from kinova_ros_interface.kinova_client import KinovaRobot
 from kinova_ros_interface.utilities import DeviceConnection
@@ -98,7 +98,7 @@ class ControlInterface():
             self.state.kinova_command.q = msg.data
             self.kinova.set_high_level_position(self.state.kinova_command.q)
         elif self.mode == "HLC_velocity":
-            self.state.kinova_command.dq = msg.data
+            self.state.kinova_command.dq = np.rad_to_deg(msg.data)
             self.kinova.set_high_level_velocity(self.state.kinova_command.dq)
         elif self.mode == "LLC_velocity":
             self.kinova.joints_command = msg.data

@@ -13,6 +13,7 @@ from kinova_ros_interface.state import State
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, Float64, Bool, Int32, Empty
 from std_srvs.srv import Trigger, SetBool
+from sensor_msgs.msg import Joy
 
 PUBLISH_RATE = 40 #Hz
 
@@ -26,6 +27,10 @@ class ControlInterface():
         rospy.Subscriber("/kinova/command", Float64MultiArray, self.callback_command)
         rospy.Subscriber("/kinova/gripper", Float64, self.callback_gripper)
         rospy.Subscriber("/kinova/error_ack", Empty, self.callback_error_ack)
+
+        # Emergency switch
+        rospy.Subscriber("/bluetooth_teleop/joy", Joy, self.callback_emergency_switch)
+        self.emergency_switch_pressed = False
 
         # Services for setting predefined joint positions
         rospy.Service("/kinova/go_home_position", Trigger, self.handle_go_home_pos)
@@ -94,16 +99,25 @@ class ControlInterface():
         
 
     def callback_command(self, msg):
-        if self.mode == "HLC_position":
-            self.state.kinova_command.q = msg.data
-            self.kinova.set_high_level_position(self.state.kinova_command.q)
-        elif self.mode == "HLC_velocity":
-            self.state.kinova_command.dq = np.rad2deg(msg.data)
-            self.kinova.set_high_level_velocity(self.state.kinova_command.dq)
-        elif self.mode == "LLC_velocity":
-            self.kinova.joints_command = msg.data
-        elif self.mode == "LLC_position":
-            print("Not yet implemented. Command ignored.")
+        if not self.emergency_switch_pressed:
+            if self.mode == "HLC_position":
+                self.state.kinova_command.q = np.rad2deg(msg.data)
+                self.kinova.set_high_level_position(self.state.kinova_command.q)
+            elif self.mode == "HLC_velocity":
+                self.state.kinova_command.dq = np.rad2deg(msg.data)
+                self.kinova.set_high_level_velocity(self.state.kinova_command.dq)
+            elif self.mode == "LLC_velocity":
+                self.kinova.joints_command = np.rad2deg(msg.data)
+            elif self.mode == "LLC_position":
+                print("Not yet implemented. Command ignored.")
+        
+    def callback_emergency_switch(self, msg):
+        if msg.buttons[4]:
+            self.emergency_switch_pressed = True
+            self.set_zero_velocity()
+        else:
+            self.emergency_switch_pressed = False
+
 
 
     def callback_gripper(self, msg):
@@ -150,6 +164,9 @@ class ControlInterface():
         print("Control Mode changed to: ", self.mode)
         return True, self.mode
 
+    def set_zero_velocity(self):
+        self.state.kinova_command.dq = self.kinova.actuator_count * [0.]
+        self.kinova.set_high_level_velocity(self.state.kinova_command.dq)
 
         
 

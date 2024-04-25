@@ -1,3 +1,6 @@
+> :warning: **This repository will be achieved soon in favor of https://github.com/INTERACT-tud-amr/dinova**
+
+
 # kinova_ros_interface
 
 ## Requirements
